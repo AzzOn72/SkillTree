@@ -16,6 +16,11 @@ import type {
   ResearchProject,
   ResearchNote,
   Note,
+  LearningGoal,
+  PortfolioItem,
+  Source,
+  Recommendation,
+  PerformanceRecord,
 } from '../types';
 import { validateLLMResponse } from '../engine/validator';
 import { buildGraph, generateGraphId, initializeStatuses } from '../engine/graph';
