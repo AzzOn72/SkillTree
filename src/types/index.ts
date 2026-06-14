@@ -166,6 +166,15 @@ export interface PortfolioItem {
   image?: string;
 }
 
+export interface RecentActivity {
+  id: string;
+  type: 'skill' | 'lesson' | 'research' | 'goal';
+  title: string;
+  description: string;
+  xp: number;
+  timestamp: number;
+}
+
 export interface UserProfile {
   id: string;
   displayName: string;
@@ -179,6 +188,7 @@ export interface UserProfile {
   isPublic: boolean;
   learningGoals: LearningGoal[];
   portfolioItems: PortfolioItem[];
+  recentActivity: RecentActivity[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

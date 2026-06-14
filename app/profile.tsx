@@ -347,6 +347,36 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Recent Activity Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <View style={styles.activityList}>
+            {profile.recentActivity.length === 0 ? (
+              <Text style={styles.emptyText}>No recent activity. Start learning to track your progress!</Text>
+            ) : (
+              profile.recentActivity.map((activity) => (
+                <View key={activity.id} style={styles.activityCard}>
+                  <View style={styles.activityIcon}>
+                    <Text>
+                      {activity.type === 'skill' ? '⚡' :
+                       activity.type === 'lesson' ? '📚' :
+                       activity.type === 'research' ? '🔬' : '🎯'}
+                    </Text>
+                  </View>
+                  <View style={styles.activityContent}>
+                    <Text style={styles.activityTitle}>{activity.title}</Text>
+                    <Text style={styles.activityDesc}>{activity.description}</Text>
+                    <Text style={styles.activityTime}>
+                      {new Date(activity.timestamp).toLocaleString()}
+                    </Text>
+                  </View>
+                  <Text style={styles.activityXp}>+{activity.xp} XP</Text>
+                </View>
+              ))
+            )}
+          </View>
+        </View>
+
         {/* Portfolio Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -857,5 +887,48 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     lineHeight: 24,
+  },
+  activityList: {
+    gap: 12,
+  },
+  activityCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: Colors.surface,
+    padding: 16,
+    borderRadius: Radii.lg,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+  },
+  activityIcon: {
+    width: 40,
+    height: 40,
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  activityContent: {
+    flex: 1,
+    gap: 4,
+  },
+  activityTitle: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  activityDesc: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+  },
+  activityTime: {
+    ...Typography.small,
+    color: Colors.textDim,
+  },
+  activityXp: {
+    ...Typography.caption,
+    color: Colors.tierFoundation,
+    fontWeight: '700',
   },
 });

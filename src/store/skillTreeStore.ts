@@ -111,6 +111,7 @@ const INITIAL_PROFILE: UserProfile = {
   isPublic: false,
   learningGoals: [],
   portfolioItems: [],
+  recentActivity: [],
 };
 
 const INITIAL_LEARNING_MODULES: LearningModule[] = [
@@ -476,6 +477,14 @@ export const useSkillGridStore = create<SkillGridStore>((set, get) => ({
       lastActiveDate: Date.now(),
     });
 
+    // Record activity
+    get().recordActivity({
+      type: 'skill',
+      title: completedNode.title,
+      description: `Completed ${completedNode.tier} tier skill in ${instance.graph.goalTitle}`,
+      xp: completedNode.xpReward,
+    });
+
     // Check achievements
     if (newTotalSkills === 1) {
       get().unlockAchievement('first-skill');
@@ -538,6 +547,19 @@ export const useSkillGridStore = create<SkillGridStore>((set, get) => ({
   updateProfile: (updates: Partial<UserProfile>) => {
     set((state) => ({
       profile: { ...state.profile, ...updates },
+    }));
+  },
+  recordActivity: (activity: Omit<RecentActivity, 'id' | 'timestamp'>) => {
+    const newActivity: RecentActivity = {
+      ...activity,
+      id: 'activity-' + Date.now(),
+      timestamp: Date.now(),
+    };
+    set((state) => ({
+      profile: {
+        ...state.profile,
+        recentActivity: [newActivity, ...state.profile.recentActivity].slice(0, 20),
+      },
     }));
   },
   addLearningGoal: (goal: Omit<LearningGoal, 'id' | 'createdAt' | 'completed' | 'currentXp'>) => {
