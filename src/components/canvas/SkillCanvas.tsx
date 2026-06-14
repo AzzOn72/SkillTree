@@ -1,19 +1,12 @@
 /**
- * SkillGrid — SkillCanvas Component (Redesigned & Enhanced)
+ * SkillGrid — SkillCanvas Component (Fixed & Enhanced)
  *
- * The infinite 2D pan/zoom canvas that renders the full DAG.
- *
- * Performance design:
- *   - Viewport culling: Only render nodes/edges that are visible
- *   - Pan/zoom: ONLY the Animated.View transform changes. Neither SkillNode
- *     nor SkillEdge re-renders during gesture handling.
- *   - Gesture composition: Gesture.Simultaneous(pan, pinch) allows both
- *     gestures to fire concurrently.
- *   - Scale anchor: The pinch gesture anchors to the gesture focal point.
- *   - Node callbacks: stable useCallback refs passed down.
- *   - Inertial scrolling: Smooth decay after pan.
- *   - Pan/drag boundary limits: Prevent users from getting lost.
- *   - Zoom level indicators.
+ * Fixed issues:
+ *  - Improved navigation with relaxed boundaries
+ *  - Better initial positioning
+ *  - Moved controls to bottom to avoid covering top
+ *  - Improved zoom range and responsiveness
+ *  - Added zoom in/out buttons for accessibility
  */
 
 import React, { useCallback, useMemo } from 'react';
@@ -29,14 +22,16 @@ import {
   GestureDetector,
   Gesture,
 } from 'react-native-gesture-handler';
-import Svg, { Line as SvgLine } from 'react-native-svg';
+import Svg from 'react-native-svg';
 import { SkillNode } from './SkillNode';
 import { SkillEdge } from './SkillEdge';
 import { Colors, Typography, Radii } from '../../constants/theme';
 import { CANVAS_CONSTRAINTS } from '../../types';
 import type { NodeId, NodeStatus, LayoutResult, SkillGraph } from '../../types';
 
-const { MIN_SCALE, MAX_SCALE, NODE_WIDTH, NODE_HEIGHT } = CANVAS_CONSTRAINTS;
+const { NODE_WIDTH, NODE_HEIGHT } = CANVAS_CONSTRAINTS;
+const MIN_SCALE = 0.2;
+const MAX_SCALE = 3.0;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Props
@@ -65,31 +60,29 @@ export const SkillCanvas: React.FC<SkillCanvasProps> = ({
 
   const { canvasWidth, canvasHeight } = layout;
   
-  // ── Canvas origin offset: center the graph on screen ──────────────────────
-  const initialOffsetX = screenW / 2 - (canvasWidth / 2) * 0.65;
-  const initialOffsetY = 140; // Leave room for XP bar + header
+  // ── Canvas origin offset: center the graph initially ─────────────────────
+  const initialOffsetX = screenW / 2 - (canvasWidth / 2) * 0.8;
+  const initialOffsetY = screenH / 2 - (canvasHeight / 2) * 0.8;
 
   // ── Reanimated shared values ──────────────────────────────────────────────
   const translateX = useSharedValue(initialOffsetX);
   const translateY = useSharedValue(initialOffsetY);
-  const scale = useSharedValue(0.65);
+  const scale = useSharedValue(0.8);
 
   const savedTranslateX = useSharedValue(initialOffsetX);
   const savedTranslateY = useSharedValue(initialOffsetY);
-  const savedScale = useSharedValue(0.65);
+  const savedScale = useSharedValue(0.8);
   const lastScale = useSharedValue(1);
 
-  // ── Boundary calculation function ──────────────────────────────────────────────────
+  // ── Boundary calculation function (relaxed) ──────────────────────────────
   const clampTranslation = (x: number, y: number, s: number) => {
     'worklet';
-    // Min X: don't let canvas right edge move past viewport left edge
-    const minX = screenW - (canvasWidth + 100) * s;
-    // Max X: don't let canvas left edge move past viewport right edge
-    const maxX = 100 * s;
-    // Min Y: don't let canvas bottom edge move past viewport top edge
-    const minY = screenH - (canvasHeight + 100) * s;
-    // Max Y: don't let canvas top edge move past viewport bottom edge
-    const maxY = 140 * s;
+    // Allow more space around the canvas
+    const padding = 200;
+    const minX = screenW - (canvasWidth + padding) * s;
+    const maxX = padding * s;
+    const minY = screenH - (canvasHeight + padding) * s;
+    const maxY = padding * s;
 
     return {
       x: clamp(x, minX, maxX),
@@ -97,7 +90,7 @@ export const SkillCanvas: React.FC<SkillCanvasProps> = ({
     };
   };
 
-  // ── Pan Gesture (with inertia and boundary limits) ────────────────────
+  // ── Pan Gesture (with inertia) ────────────────────────────────────────────
   const panGesture = Gesture.Pan()
     .onChange((e) => {
       let newX = savedTranslateX.value + e.translationX;
@@ -110,24 +103,24 @@ export const SkillCanvas: React.FC<SkillCanvasProps> = ({
       // Natural native-feeling decay momentum
       translateX.value = withDecay({
         velocity: e.velocityX,
-        deceleration: 0.995,
+        deceleration: 0.99,
       });
       translateY.value = withDecay({
         velocity: e.velocityY,
-        deceleration: 0.995,
+        deceleration: 0.99,
       });
       
-      // Then clamp after decay
+      // Clamp after decay with spring
       setTimeout(() => {
         const clamped = clampTranslation(translateX.value, translateY.value, scale.value);
-        translateX.value = withSpring(clamped.x, { damping: 20, stiffness: 200 });
-        translateY.value = withSpring(clamped.y, { damping: 20, stiffness: 200 });
+        translateX.value = withSpring(clamped.x, { damping: 25, stiffness: 300 });
+        translateY.value = withSpring(clamped.y, { damping: 25, stiffness: 300 });
         savedTranslateX.value = clamped.x;
         savedTranslateY.value = clamped.y;
-      }, 50);
+      }, 100);
     });
 
-  // ── Pinch Gesture (improved pivot + boundary limits) ─────────────────────────
+  // ── Pinch Gesture (improved) ──────────────────────────────────────────────
   const pinchGesture = Gesture.Pinch()
     .onStart(() => {
       lastScale.value = 1;
@@ -161,7 +154,7 @@ export const SkillCanvas: React.FC<SkillCanvasProps> = ({
   // ── Composed gesture ──────────────────────────────────────────────────────
   const composedGesture = Gesture.Simultaneous(panGesture, pinchGesture);
 
-  // ── Animated canvas transform ─────────────────────────────────────────────────────
+  // ── Animated canvas transform ────────────────────────────────────────────
   const canvasAnimatedStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: translateX.value },
@@ -170,8 +163,8 @@ export const SkillCanvas: React.FC<SkillCanvasProps> = ({
     ],
   }));
 
-  // ── Zoom level indicator text ──────────────────────────────────────────────────
-  const zoomPercent = Math.round((scale.value || 0.65) * 100);
+  // ── Zoom level indicator ──────────────────────────────────────────────────
+  const zoomPercent = Math.round(scale.value * 100);
 
   // ── Stable callback refs ──────────────────────────────────────────────────
   const handleNodePress = useCallback(
@@ -183,10 +176,44 @@ export const SkillCanvas: React.FC<SkillCanvasProps> = ({
     [onNodeLongPress],
   );
 
+  // ── Zoom in/out handlers ──────────────────────────────────────────────────
+  const handleZoomIn = useCallback(() => {
+    const newScale = clamp(scale.value * 1.3, MIN_SCALE, MAX_SCALE);
+    const clamped = clampTranslation(translateX.value, translateY.value, newScale);
+    translateX.value = withSpring(clamped.x, { damping: 20, stiffness: 200 });
+    translateY.value = withSpring(clamped.y, { damping: 20, stiffness: 200 });
+    scale.value = withSpring(newScale, { damping: 20, stiffness: 200 });
+    savedTranslateX.value = clamped.x;
+    savedTranslateY.value = clamped.y;
+    savedScale.value = newScale;
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    const newScale = clamp(scale.value * 0.7, MIN_SCALE, MAX_SCALE);
+    const clamped = clampTranslation(translateX.value, translateY.value, newScale);
+    translateX.value = withSpring(clamped.x, { damping: 20, stiffness: 200 });
+    translateY.value = withSpring(clamped.y, { damping: 20, stiffness: 200 });
+    scale.value = withSpring(newScale, { damping: 20, stiffness: 200 });
+    savedTranslateX.value = clamped.x;
+    savedTranslateY.value = clamped.y;
+    savedScale.value = newScale;
+  }, []);
+
+  // ── Reset view button handler ─────────────────────────────────────────────
+  const handleResetView = useCallback(() => {
+    const clamped = clampTranslation(initialOffsetX, initialOffsetY, 0.8);
+    translateX.value = withSpring(clamped.x, { damping: 25, stiffness: 300 });
+    translateY.value = withSpring(clamped.y, { damping: 25, stiffness: 300 });
+    scale.value = withSpring(0.8, { damping: 25, stiffness: 300 });
+    savedTranslateX.value = clamped.x;
+    savedTranslateY.value = clamped.y;
+    savedScale.value = 0.8;
+  }, [initialOffsetX, initialOffsetY]);
+
   // ── Viewport Culling Logic ────────────────────────────────────────────────
   const visibleNodeLayouts = useMemo(() => {
     const padding = 200;
-    const currentScale = scale.value || 0.65;
+    const currentScale = scale.value || 0.8;
     const currentX = translateX.value || initialOffsetX;
     const currentY = translateY.value || initialOffsetY;
     
@@ -225,17 +252,6 @@ export const SkillCanvas: React.FC<SkillCanvasProps> = ({
       })),
     [visibleEdges, statuses],
   );
-
-  // ── Reset view button handler ─────────────────────────────────────────────────
-  const handleResetView = useCallback(() => {
-    const clamped = clampTranslation(initialOffsetX, initialOffsetY, 0.65);
-    translateX.value = withSpring(clamped.x, { damping: 22, stiffness: 200 });
-    translateY.value = withSpring(clamped.y, { damping: 22, stiffness: 200 });
-    scale.value = withSpring(0.65, { damping: 22, stiffness: 200 });
-    savedTranslateX.value = clamped.x;
-    savedTranslateY.value = clamped.y;
-    savedScale.value = 0.65;
-  }, [initialOffsetX, initialOffsetY]);
 
   return (
     <View style={[styles.container, { width: screenW, height: screenH }]}>
@@ -278,15 +294,28 @@ export const SkillCanvas: React.FC<SkillCanvasProps> = ({
         </Animated.View>
       </GestureDetector>
 
-      {/* Zoom level indicator */}
-      <View style={styles.zoomIndicator}>
-        <Text style={styles.zoomText}>{zoomPercent}%</Text>
-      </View>
+      {/* Bottom control bar */}
+      <View style={styles.controlsContainer}>
+        {/* Zoom out button */}
+        <Pressable style={styles.controlBtn} onPress={handleZoomOut}>
+          <Text style={styles.controlBtnText}>−</Text>
+        </Pressable>
 
-      {/* Reset view button */}
-      <Pressable style={styles.resetBtn} onPress={handleResetView}>
-        <Text style={styles.resetBtnText}>⟲ Reset</Text>
-      </Pressable>
+        {/* Zoom indicator */}
+        <View style={styles.zoomIndicator}>
+          <Text style={styles.zoomText}>{zoomPercent}%</Text>
+        </View>
+
+        {/* Zoom in button */}
+        <Pressable style={styles.controlBtn} onPress={handleZoomIn}>
+          <Text style={styles.controlBtnText}>+</Text>
+        </Pressable>
+
+        {/* Reset button */}
+        <Pressable style={styles.resetBtn} onPress={handleResetView}>
+          <Text style={styles.resetBtnText}>Reset</Text>
+        </Pressable>
+      </View>
     </View>
   );
 };
@@ -305,17 +334,39 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
   },
-  zoomIndicator: {
+  controlsContainer: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 30,
     left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    zIndex: 20,
+  },
+  controlBtn: {
+    backgroundColor: Colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    borderRadius: Radii.full,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  controlBtnText: {
+    fontSize: 24,
+    color: Colors.tierFoundation,
+    fontWeight: '700',
+  },
+  zoomIndicator: {
     backgroundColor: Colors.surfaceRaised,
     borderWidth: 1,
     borderColor: Colors.glassBorder,
     borderRadius: Radii.lg,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    zIndex: 20,
   },
   zoomText: {
     ...Typography.caption,
@@ -323,16 +374,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   resetBtn: {
-    position: 'absolute',
-    top: 140,
-    right: 20,
     backgroundColor: Colors.surfaceRaised,
     borderWidth: 1,
     borderColor: Colors.glassBorder,
     borderRadius: Radii.lg,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    zIndex: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   resetBtnText: {
     ...Typography.caption,
