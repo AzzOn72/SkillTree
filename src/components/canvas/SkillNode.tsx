@@ -183,6 +183,11 @@ const SkillNodeInner: React.FC<SkillNodeProps> = ({
           onPress={handlePress}
           onLongPress={handleLongPress}
           android_ripple={status !== 'locked' ? { color: `${tierColor}33`, borderless: false } : undefined}
+          accessible={true}
+          accessibilityLabel={`${node.title}, ${status}, ${node.tier} tier, ${node.xpReward} XP`}
+          accessibilityHint={status === 'unlockable' ? 'Double tap to complete this skill' : 'Hold for more options'}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: status === 'locked' }}
         >
           {/* Tier badge */}
           <View style={[styles.tierBadge, { backgroundColor: `${tierColor}15` }]}>
