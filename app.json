@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "SkillGrid",
+    "slug": "skillgrid",
+    "scheme": "skillgrid",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
