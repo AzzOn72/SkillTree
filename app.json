@@ -12,6 +12,15 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e84c16e7-5129-4552-8f6d-d664579c6aaf"
+      }
+    },
+    "android": {
+      "package": "com.skillgrid.app"
     }
   }
 }
